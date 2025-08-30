@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Responsive Image Gallery • Lightbox + Filters</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --card: #121821;
+      --text: #e7edf5;
+      --muted: #9fb0c0;
+      --accent: #5ac2ff;
+      --accent-2: #7effb2;
+      --shadow: 0 10px 30px rgba(0,0,0,.25);
+      --img-filter: none; /* updated by filter control */
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text); background: radial-gradient(1200px 800px at 10% -10%, #182233, transparent), var(--bg);
+    }
+
+    header {
+      position: sticky; top: 0; z-index: 2; backdrop-filter: blur(8px);
+      background: linear-gradient(180deg, rgba(11,15,20,.9), rgba(11,15,20,.6));
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+
+    h1 { margin: 0 0 8px; font-size: clamp(20px, 2.8vw, 28px); letter-spacing: .2px; }
+    p.lead { margin: 0; color: var(--muted); font-size: 14px; }
+
+    /* Controls */
+    .controls { display: grid; gap: 12px; grid-template-columns: 1fr; align-items: center; margin-top: 16px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; }
+    .btn {
+      appearance: none; border: 1px solid rgba(255,255,255,.14); color: var(--text);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      padding: 8px 12px; border-radius: 999px; cursor: pointer; transition: transform .12s ease, border-color .2s ease, background .2s ease;
+    }
+    .btn:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.25); }
+    .btn.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+    .select-wrap { display: flex; gap: 10px; align-items: center; }
+    select {
+      background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,.14);
+      padding: 8px 12px; border-radius: 10px; box-shadow: var(--shadow);
+    }
+
+    /* Gallery */
+    .gallery { 
+      margin-top: 20px;
+      display: grid; gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    figure { 
+      margin: 0; position: relative; overflow: hidden; border-radius: 16px;
+      background: var(--card); box-shadow: var(--shadow);
+      outline: 1px solid rgba(255,255,255,.06);
+      transition: outline-color .2s ease;
+    }
+    figure:hover { outline-color: rgba(90,194,255,.35); }
+
+    .thumb {
+      width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; filter: var(--img-filter);
+      transition: transform .5s ease, opacity .3s ease, filter .25s ease;
+    }
+    figure:hover .thumb { transform: scale(1.06); }
+
+    figcaption {
+      position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 12px; font-size: 13px; color: #eef6ff;
+      background: linear-gradient(180deg, transparent, rgba(0,0,0,.7));
+      transform: translateY(6px); opacity: .0; transition: transform .25s ease, opacity .25s ease;
+    }
+    figure:hover figcaption { transform: translateY(0); opacity: 1; }
+
+    .hidden { display: none !important; }
+
+    /* Lightbox */
+    .lightbox {
+      position: fixed; inset: 0; display: none; place-items: center; padding: 24px; z-index: 10;
+      background: radial-gradient(1200px 800px at 50% -20%, rgba(122,164,255,.14), transparent), rgba(0,0,0,.76);
+      animation: fadeIn .2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+    .lightbox[aria-hidden="false"] { display: grid; }
+
+    .lightbox-inner {
+      position: relative; max-width: 95vw; max-height: 86vh; width: min(1200px, 95vw);
+      display: grid; grid-template-rows: 1fr auto; gap: 10px;
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.01));
+      border: 1px solid rgba(255,255,255,.1); border-radius: 18px; box-shadow: var(--shadow);
+      padding: 14px; backdrop-filter: blur(8px);
+    }
+
+    .lightbox img {
+      width: 100%; height: 100%; object-fit: contain; filter: var(--img-filter);
+    }
+
+    .lightbox .caption { color: var(--muted); font-size: 14px; padding: 4px 6px 10px; }
+
+    .icon-btn {
+      position: absolute; top: 10px; width: 42px; height: 42px; border-radius: 999px; border: 1px solid rgba(255,255,255,.2);
+      background: rgba(0,0,0,.4); color: var(--text); cursor: pointer; display: grid; place-items: center; font-size: 20px;
+      transition: transform .12s ease, background .2s ease, border-color .2s ease;
+    }
+    .icon-btn:hover { transform: translateY(-1px); background: rgba(0,0,0,.55); border-color: rgba(255,255,255,.35); }
+
+    .btn-prev { left: 10px; top: 50%; transform: translateY(-50%); }
+    .btn-next { right: 10px; top: 50%; transform: translateY(-50%); }
+    .btn-close { right: 10px; }
+
+    /* Footer note */
+    footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px 0 36px; }
+
+    @media (max-width: 520px) {
+      .lightbox-inner { padding: 10px; }
+      .icon-btn { width: 38px; height: 38px; font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Image Gallery – Lightbox, Filters, Responsive</h1>
+      <p class="lead">Click any photo to open the lightbox. Use Next/Prev (or ←/→ keys). Filter by category, and add CSS image effects.</p>
+      <div class="controls">
+        <div class="filters" role="tablist" aria-label="Category filters">
+          <button class="btn active" data-filter="all" role="tab" aria-selected="true">All</button>
+          <button class="btn" data-filter="nature" role="tab" aria-selected="false">Nature</button>
+          <button class="btn" data-filter="city" role="tab" aria-selected="false">City</button>
+          <button class="btn" data-filter="people" role="tab" aria-selected="false">People</button>
+          <button class="btn" data-filter="animals" role="tab" aria-selected="false">Animals</button>
+        </div>
+        <div class="select-wrap">
+          <label for="fx">Image effect:</label>
+          <select id="fx" aria-label="Image effects">
+            <option value="none">None</option>
+            <option value="grayscale(1)">Grayscale</option>
+            <option value="sepia(.8)">Sepia</option>
+            <option value="contrast(1.2) brightness(1.05)">High Contrast</option>
+            <option value="saturate(1.4)">Saturated</option>
+            <option value="blur(1px)">Soft Blur</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="gallery" id="gallery" aria-live="polite">
+      <!-- Sample images via picsum.photos; replace src & captions with your own -->
+      <!-- Nature -->
+      <figure data-category="nature">
+        <img class="thumb" src="/Screenshot 2025-08-26 162613.png" alt="River winding through a forest at sunset" loading="lazy" />
+        <figcaption>Forest River • Nature</figcaption>
+      </figure>
+      <figure data-category="nature">
+        <img class="thumb" src="/Screenshot 2025-08-27 115020.png" alt="Snowy mountain under clear sky" loading="lazy" />
+        <figcaption>Snowy Peak • Nature</figcaption>
+      </figure>
+      <figure data-category="nature">
+        <img class="thumb" src="/Screenshot 2025-08-27 112547.png" alt="Rocky shoreline with waves" loading="lazy" />
+        <figcaption>Rocky Shore • Nature</figcaption>
+      </figure>
+
+      <!-- City -->
+      <figure data-category="city">
+        <img class="thumb" src="/Screenshot 2025-08-27 112659.png" alt="City skyline at dusk" loading="lazy" />
+        <figcaption>Skyline at Dusk • City</figcaption>
+      </figure>
+      <figure data-category="city">
+        <img class="thumb" src="/Screenshot 2025-08-27 112828.png" alt="Cobbled street with neon lights" loading="lazy" />
+        <figcaption>Old Street • City</figcaption>
+      </figure>
+      <figure data-category="city">
+        <img class="thumb" src="/Screenshot 2025-08-27 113018.png" alt="Modern architecture glass facade" loading="lazy" />
+        <figcaption>Glass Facade • City</figcaption>
+      </figure>
+
+      <!-- People -->
+      <figure data-category="people">
+        <img class="thumb" src="/Screenshot 2025-08-27 113144.png" alt="Portrait of a smiling person in sunlight" loading="lazy" />
+        <figcaption>Smile in Sunlight • People</figcaption>
+      </figure>
+      <figure data-category="people">
+        <img class="thumb" src="/Screenshot 2025-08-27 113427.png" alt="Group of friends walking on the beach" loading="lazy" />
+        <figcaption>Beach Walk • People</figcaption>
+      </figure>
+
+      <!-- Animals -->
+      <figure data-category="animals">
+        <img class="thumb" src="/Screenshot 2025-08-27 113732.png" alt="Close-up of a curious dog" loading="lazy" />
+        <figcaption>Curious Dog • Animals</figcaption>
+      </figure>
+      <figure data-category="animals">
+        <img class="thumb" src="/Screenshot 2025-08-27 114056.png" alt="Majestic bird in flight" loading="lazy" />
+        <figcaption>Bird in Flight • Animals</figcaption>
+      </figure>
+      <figure data-category="animals">
+        <img class="thumb" src="/Screenshot 2025-08-27 114311.png" alt="Cat lounging on a windowsill" loading="lazy" />
+        <figcaption>Window Cat • Animals</figcaption>
+      </figure>
+    </section>
+  </main>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Image viewer">
+    <div class="lightbox-inner">
+      <button class="icon-btn btn-close" id="btnClose" aria-label="Close">✕</button>
+      <button class="icon-btn btn-prev" id="btnPrev" aria-label="Previous">❮</button>
+      <button class="icon-btn btn-next" id="btnNext" aria-label="Next">❯</button>
+      <img id="lightboxImg" alt="" />
+      <div class="caption" id="lightboxCaption"></div>
+    </div>
+  </div>
+
+  <footer>
+    Built with plain HTML, CSS & JavaScript. Replace the <code>src</code> and <code>figcaption</code> with your own images.
+  </footer>
+
+  <script>
+    // === State ===
+    const gallery = document.getElementById('gallery');
+    const figures = Array.from(gallery.querySelectorAll('figure'));
+    const filterButtons = Array.from(document.querySelectorAll('.filters .btn'));
+    const lightbox = document.getElementById('lightbox');
+    const imgEl = document.getElementById('lightboxImg');
+    const capEl = document.getElementById('lightboxCaption');
+    const btnClose = document.getElementById('btnClose');
+    const btnPrev = document.getElementById('btnPrev');
+    const btnNext = document.getElementById('btnNext');
+    const fxSelect = document.getElementById('fx');
+
+    let visible = figures; // current visible items after filter
+    let activeIndex = 0;   // index within `visible`
+
+    // === Helpers ===
+    function updateVisible(filter) {
+      visible = [];
+      figures.forEach(fig => {
+        const match = filter === 'all' || fig.dataset.category === filter;
+        fig.classList.toggle('hidden', !match);
+        if (match) visible.push(fig);
+      });
+    }
+
+    function setActive(i) {
+      if (!visible.length) return;
+      activeIndex = (i + visible.length) % visible.length; // loop
+      const fig = visible[activeIndex];
+      const img = fig.querySelector('img');
+      imgEl.src = img.src;
+      imgEl.alt = img.alt;
+      capEl.textContent = fig.querySelector('figcaption')?.textContent || '';
+      // Preload neighbors for smoother nav
+      const next = visible[(activeIndex + 1) % visible.length]?.querySelector('img')?.src;
+      const prev = visible[(activeIndex - 1 + visible.length) % visible.length]?.querySelector('img')?.src;
+      if (next) (new Image()).src = next;
+      if (prev) (new Image()).src = prev;
+    }
+
+    function openLightbox(i) {
+      setActive(i);
+      lightbox.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      btnClose.focus();
+    }
+
+    function closeLightbox() {
+      lightbox.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    }
+
+    // === Init ===
+    updateVisible('all');
+
+    // Thumbnail click -> open lightbox
+    figures.forEach((fig, idxAll) => {
+      fig.addEventListener('click', () => {
+        // Map from full list index to visible index
+        const i = visible.indexOf(fig);
+        openLightbox(i === -1 ? 0 : i);
+      });
+      fig.tabIndex = 0;
+      fig.setAttribute('role', 'button');
+      fig.setAttribute('aria-label', fig.querySelector('img')?.alt || 'Open image');
+      fig.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          const i = visible.indexOf(fig);
+          openLightbox(i === -1 ? 0 : i);
+        }
+      });
+    });
+
+    // Filter buttons
+    filterButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterButtons.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
+        btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
+        const filter = btn.dataset.filter;
+        updateVisible(filter);
+      });
+    });
+
+    // Image effect control -> CSS variable
+    fxSelect.addEventListener('change', (e) => {
+      document.documentElement.style.setProperty('--img-filter', e.target.value);
+    });
+
+    // Lightbox controls
+    btnClose.addEventListener('click', closeLightbox);
+    btnPrev.addEventListener('click', () => setActive(activeIndex - 1));
+    btnNext.addEventListener('click', () => setActive(activeIndex + 1));
+
+    // Clicking the dimmed area closes lightbox
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) closeLightbox();
+    });
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      const open = lightbox.getAttribute('aria-hidden') === 'false';
+      if (!open) return;
+      if (e.key === 'Escape') closeLightbox();
+      else if (e.key === 'ArrowRight') setActive(activeIndex + 1);
+      else if (e.key === 'ArrowLeft') setActive(activeIndex - 1);
+    });
+
+    // Handle window resize (keep active image index valid if visibility changes)
+    const ro = new ResizeObserver(() => {
+      if (lightbox.getAttribute('aria-hidden') === 'false') {
+        // Ensure we don't point to a hidden image after filter changes
+        if (!visible[activeIndex]) setActive(0);
+      }
+    });
+    ro.observe(gallery);
+  </script>
+</body>
+</html>
+
